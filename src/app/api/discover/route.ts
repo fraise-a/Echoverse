@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  interpretMultimodalDiscovery,
-  explainRealCandidateTracks,
-} from '@/lib/gemini/service';
+import { interpretMultimodalDiscovery } from '@/lib/gemini/service';
 import { isGeminiConfigured } from '@/lib/gemini/config';
 import {
   getJamendoClientId,
@@ -104,19 +101,9 @@ export async function POST(request: NextRequest) {
         8
       );
 
-      // Ground explanations in real Jamendo track metadata
-      const effectiveQuery =
-        interpretation.spokenTranscript ||
-        prompt ||
-        interpretation.querySummary;
-      const aiReasons = await explainRealCandidateTracks(
-        effectiveQuery,
-        jamendoResult.tracks
-      );
-
       const { planets, constellations } = buildUniverseFromTracks(
         jamendoResult.tracks,
-        aiReasons,
+        {},
         interpretation.atmosphere,
         false
       );

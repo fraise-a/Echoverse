@@ -53,15 +53,21 @@ export async function POST(request: NextRequest) {
     const usedArtistIds = new Set<string>();
     const journeySteps: JourneyStep[] = [];
 
+    const stageSearchResults = await Promise.all(
+      blueprint.stages.map((stage) =>
+        searchJamendoTracksWithFallback(
+          {
+            ...stage.criteria,
+            limit: 12,
+          },
+          3
+        )
+      )
+    );
+
     for (let i = 0; i < blueprint.stages.length; i++) {
       const stage = blueprint.stages[i];
-      const searchRes = await searchJamendoTracksWithFallback(
-        {
-          ...stage.criteria,
-          limit: 12,
-        },
-        3
-      );
+      const searchRes = stageSearchResults[i];
 
       // Pick the first real track whose ID and artist haven't been used yet
       let chosen: JamendoTrack | undefined = searchRes.tracks.find(

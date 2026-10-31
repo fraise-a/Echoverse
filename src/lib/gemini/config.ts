@@ -7,12 +7,12 @@ import { GoogleGenAI } from '@google/genai';
 export const GEMINI_CONFIG = {
   // Primary multimodal model supporting text, vision (image/camera), audio, and structured JSON output
   primaryMultimodalModel:
-    process.env.GEMINI_MODEL_PRIMARY || 'gemini-3.8-flash',
+    process.env.GEMINI_MODEL_PRIMARY || 'gemini-2.5-flash',
   // Fallback multimodal model if the primary model experiences transient unavailability
   fallbackMultimodalModel:
     process.env.GEMINI_MODEL_FALLBACK || 'gemini-flash-latest',
-  maxRetries: 2,
-  initialBackoffMs: 700,
+  maxRetries: 1,
+  initialBackoffMs: 600,
 } as const;
 
 export function isGeminiConfigured(): boolean {

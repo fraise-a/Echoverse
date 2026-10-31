@@ -7,6 +7,30 @@ import {
 } from '@/types/echoverse';
 import { DEFAULT_ATMOSPHERE } from '@/lib/jamendo/universe-builder';
 
+const GEMINI_CACHE_TTL_MS = 15 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 40;
+
+const discoveryCache = new Map<
+  string,
+  { timestamp: number; data: MultimodalDiscoveryInterpretation }
+>();
+const journeyCache = new Map<
+  string,
+  { timestamp: number; data: PlannedJourneyBlueprint }
+>();
+
+function setCacheEntry<T>(
+  map: Map<string, { timestamp: number; data: T }>,
+  key: string,
+  data: T
+) {
+  if (map.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey = map.keys().next().value;
+    if (oldestKey) map.delete(oldestKey);
+  }
+  map.set(key, { timestamp: Date.now(), data });
+}
+
 const DISCOVERY_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
@@ -132,6 +156,17 @@ export interface MultimodalDiscoveryInterpretation {
 export async function interpretMultimodalDiscovery(
   input: MultimodalDiscoveryInput
 ): Promise<MultimodalDiscoveryInterpretation> {
+  const cacheKey = JSON.stringify({
+    p: input.prompt?.trim() || '',
+    img: input.imageBase64 ? input.imageBase64.slice(0, 120) + ':' + input.imageBase64.length : '',
+    aud: input.audioBase64 ? input.audioBase64.slice(0, 80) + ':' + input.audioBase64.length : '',
+    hist: (input.conversationHistory || []).slice(-2),
+  });
+  const cached = discoveryCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < GEMINI_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
   const parts: Part[] = [];
 
   const systemInstruction = `You are the AI Musical Guide of Echoverse — A Universe That Listens to You.
@@ -233,7 +268,7 @@ Strict rules:
     energyLevel: Math.min(1, Math.max(0.15, Number(atm.energyLevel) || 0.55)),
   };
 
-  return {
+  const result: MultimodalDiscoveryInterpretation = {
     spokenTranscript: parsed.spokenTranscript || undefined,
     visualObservation: parsed.visualObservation || undefined,
     querySummary: parsed.querySummary || 'Cosmic Resonance',
@@ -245,6 +280,8 @@ Strict rules:
     },
     atmosphere,
   };
+  setCacheEntry(discoveryCache, cacheKey, result);
+  return result;
 }
 
 const RANKING_SCHEMA: Schema = {
@@ -447,6 +484,11 @@ export async function planMusicalJourneyBlueprint(
     ? `Starting point: "${originPrompt}"\nDestination: "${destinationPrompt}"`
     : `Journey request: "${originPrompt}"`;
 
+  const cached = journeyCache.get(combinedText);
+  if (cached && Date.now() - cached.timestamp < GEMINI_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
   const systemInstruction = `You are the AI Musical Architect of Echoverse.
 Design a coherent 5-stage musical journey ("Take Me Somewhere") progressing from the user's starting atmosphere to their destination atmosphere.
 Each of the 5 stages must use valid Jamendo search tags (ambient, electronic, synthwave, chillout, downtempo, cinematic, soundtrack, lofi, dreamy, dark, space, piano, guitar, acoustic, indie, rock, pop, jazz, classical, folk, house, techno, hiphop, experimental, relaxing, energetic, melancholic, meditation, orchestral, world, funk, soul) and valid speed/vocal/acoustic filters so real tracks can be retrieved for every step.`;
@@ -509,7 +551,7 @@ Each of the 5 stages must use valid Jamendo search tags (ambient, electronic, sy
     },
   }));
 
-  return {
+  const blueprint: PlannedJourneyBlueprint = {
     title: parsed.title || 'Cosmic Musical Journey',
     originDescription: parsed.originDescription || originPrompt,
     destinationDescription:
@@ -520,4 +562,6 @@ Each of the 5 stages must use valid Jamendo search tags (ambient, electronic, sy
     atmosphere,
     stages,
   };
+  setCacheEntry(journeyCache, combinedText, blueprint);
+  return blueprint;
 }
