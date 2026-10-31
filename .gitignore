@@ -1,0 +1,71 @@
+# Dependencies
+/node_modules
+node_modules/
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Testing & coverage
+/coverage
+coverage/
+
+# Next.js & build output
+/.next/
+.next/
+/out/
+out/
+/build
+build/
+dist/
+
+# Environment variables & secret configurations
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+.env*.local
+.env*
+!.env.example
+
+# Local credentials, certificates, and private keys
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+*credentials*.json
+*service-account*.json
+.gcloud/
+.config/
+.gemini/
+
+# Debug logs & temporary files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+*.tmp
+*.temp
+.temp/
+.cache/
+
+# macOS & OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# Vercel & deployment
+.vercel
+.netlify
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
