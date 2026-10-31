@@ -1,5 +1,12 @@
 # Echoverse — A Universe That Listens to You
 
+## Demo Video
+
+**[Watch or download the 3-minute Echoverse demo (MP4)](https://github.com/fraise-a/Echoverse/releases/download/v1.0/Echoverse-demo.mp4)**
+
+[View the published v1.0 GitHub release](https://github.com/fraise-a/Echoverse/releases/tag/v1.0) — includes the demonstration video as a downloadable asset. The source code is available in this repository.
+
+
 **Echoverse** is an interactive, multimodal AI-powered 3D music discovery platform built for the **Google DeepMind Buildathon**.
 
 > **Buildathon Submission Track:**
