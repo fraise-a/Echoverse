@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
+  RotateCcw,
 } from 'lucide-react';
 import {
   ConstellationEdge,
@@ -54,6 +55,64 @@ const MusicalUniverse = dynamic(
     ),
   }
 );
+
+class ThreeSceneErrorBoundary extends React.Component<
+  {
+    onSwitchTo2D: () => void;
+    children: React.ReactNode;
+  },
+  { hasError: boolean; errorMessage: string }
+> {
+  constructor(props: { onSwitchTo2D: () => void; children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, errorMessage: '' };
+  }
+
+  static getDerivedStateFromError(error: unknown) {
+    return {
+      hasError: true,
+      errorMessage:
+        error instanceof Error
+          ? error.message
+          : 'WebGL 3D rendering encountered an error in this browser.',
+    };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-[#030308] p-6 text-white">
+          <div className="max-w-md rounded-2xl bg-[#07091e]/95 border border-rose-400/40 p-5 text-center space-y-3 shadow-2xl">
+            <AlertTriangle className="w-8 h-8 text-rose-400 mx-auto" />
+            <h2 className="text-base font-bold">
+              3D Galaxy View Unavailable
+            </h2>
+            <p className="text-xs text-slate-300">
+              {this.state.errorMessage}
+            </p>
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => this.setState({ hasError: false, errorMessage: '' })}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 border border-white/20 text-white"
+              >
+                Retry 3D View
+              </button>
+              <button
+                type="button"
+                onClick={this.props.onSwitchTo2D}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 to-cyan-500 text-white"
+              >
+                Switch to 2D Accessible View
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const INITIAL_PROMPTS = [
   'Find me something that feels like walking through Tokyo at midnight',
@@ -141,7 +200,6 @@ export default function EchoverseApp() {
   const [guideVoiceEnabled, setGuideVoiceEnabled] = useState<boolean>(false);
   const guideVoiceEnabledRef = useRef<boolean>(false);
   const isPlayingRef = useRef<boolean>(false);
-  const hasLoadedInitialRef = useRef<boolean>(false);
 
   useEffect(() => {
     guideVoiceEnabledRef.current = guideVoiceEnabled;
@@ -253,42 +311,65 @@ export default function EchoverseApp() {
     [speakGuideResponse]
   );
 
-  // Load initial Jamendo galaxy once on mount
-  useEffect(() => {
-    if (hasLoadedInitialRef.current) return;
-    hasLoadedInitialRef.current = true;
-    let cancelled = false;
-    async function loadInitialUniverse() {
+  // Load initial Jamendo galaxy (compatible with React 18 Strict Mode & manual retries)
+  const loadInitialUniverse = useCallback(
+    async (isCancelled?: () => boolean) => {
       setIsLoading(true);
+      setLoadingLabel('Summoning real independent tracks from Jamendo...');
       setErrorBanner(null);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
       try {
-        const res = await fetch('/api/universe');
+        const res = await fetch('/api/universe', {
+          signal: controller.signal,
+          cache: 'no-store',
+        });
         const data = await res.json();
         if (!res.ok) {
           throw new Error(data.error || 'Failed to load initial universe');
         }
-        if (!cancelled) {
+        if (
+          !data ||
+          !Array.isArray(data.planets) ||
+          data.planets.length === 0
+        ) {
+          throw new Error(
+            'No playable tracks were returned from Jamendo. Please click Retry to reload the musical galaxy.'
+          );
+        }
+        if (!isCancelled || !isCancelled()) {
           applyDiscoveryResponse(data as DiscoveryResponse);
         }
       } catch (err: unknown) {
-        if (!cancelled) {
-          setErrorBanner(
-            err instanceof Error
+        if (!isCancelled || !isCancelled()) {
+          const message =
+            err instanceof Error && err.name === 'AbortError'
+              ? 'Loading the initial musical galaxy timed out. Please click Retry.'
+              : err instanceof Error
               ? err.message
-              : 'Could not reach Jamendo API.'
-          );
+              : 'Could not reach Jamendo API.';
+          setErrorBanner(message);
         }
       } finally {
-        if (!cancelled) {
+        clearTimeout(timeoutId);
+        if (!isCancelled || !isCancelled()) {
           setIsLoading(false);
         }
       }
-    }
-    loadInitialUniverse();
+    },
+    [applyDiscoveryResponse]
+  );
+
+  // Load initial Jamendo galaxy on mount
+  useEffect(() => {
+    let cancelled = false;
+    loadInitialUniverse(() => cancelled);
     return () => {
       cancelled = true;
     };
-  }, [applyDiscoveryResponse]);
+  }, [loadInitialUniverse]);
 
   // Submit natural language or follow-up prompt
   const handleDiscoverPrompt = async (customPrompt?: string) => {
@@ -802,17 +883,19 @@ export default function EchoverseApp() {
       {/* Main Viewport: 3D Galaxy or 2D Accessible Interface */}
       <main className="relative flex-1 w-full h-full overflow-hidden">
         {viewMode === '3d' ? (
-          <MusicalUniverse
-            planets={planets}
-            constellations={constellations}
-            atmosphere={atmosphere}
-            selectedPlanet={selectedPlanet}
-            playingTrackId={selectedPlanet?.track.id || null}
-            isPlaying={isPlaying}
-            reducedMotion={reducedMotion}
-            simplifiedGraphics={simplifiedGraphics}
-            onSelectPlanet={(planet) => handleSelectPlanet(planet, false)}
-          />
+          <ThreeSceneErrorBoundary onSwitchTo2D={() => setViewMode('2d')}>
+            <MusicalUniverse
+              planets={planets}
+              constellations={constellations}
+              atmosphere={atmosphere}
+              selectedPlanet={selectedPlanet}
+              playingTrackId={selectedPlanet?.track.id || null}
+              isPlaying={isPlaying}
+              reducedMotion={reducedMotion}
+              simplifiedGraphics={simplifiedGraphics}
+              onSelectPlanet={(planet) => handleSelectPlanet(planet, false)}
+            />
+          </ThreeSceneErrorBoundary>
         ) : (
           <Accessible2DView
             planets={planets}
@@ -934,20 +1017,54 @@ export default function EchoverseApp() {
                 <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
                 <span>{errorBanner || voiceError || warningBanner}</span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setErrorBanner(null);
-                  setVoiceError(null);
-                  setWarningBanner(undefined);
-                }}
-                className="text-[10px] underline shrink-0"
-              >
-                Dismiss
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => loadInitialUniverse()}
+                  className="px-2.5 py-1 rounded-lg bg-rose-500/30 hover:bg-rose-500/50 border border-rose-300/40 text-[11px] font-semibold text-white inline-flex items-center gap-1 transition"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Retry
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErrorBanner(null);
+                    setVoiceError(null);
+                    setWarningBanner(undefined);
+                  }}
+                  className="text-[10px] underline shrink-0"
+                >
+                  Dismiss
+                </button>
+              </div>
             </div>
           )}
         </div>
+
+        {/* Empty Universe Fallback & Retry Card */}
+        {!isLoading && planets.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none z-20">
+            <div className="max-w-md rounded-2xl bg-[#07091e]/95 border border-cyan-400/40 p-5 text-center space-y-3 shadow-[0_0_45px_rgba(34,211,238,0.28)] pointer-events-auto">
+              <AlertTriangle className="w-7 h-7 text-amber-400 mx-auto" />
+              <h2 className="text-sm font-bold text-white">
+                No Song Planets Loaded Yet
+              </h2>
+              <p className="text-xs text-slate-300">
+                {errorBanner ||
+                  'The musical universe could not finish loading initial tracks from Jamendo.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => loadInitialUniverse()}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 to-cyan-500 hover:from-violet-500 hover:to-cyan-400 text-white inline-flex items-center gap-1.5 shadow-lg transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Retry Loading Galaxy
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Right-Side Floating Song Planet Inspector */}
         {showInspector && selectedPlanet && (
