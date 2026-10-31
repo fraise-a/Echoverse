@@ -73,6 +73,12 @@ export interface UniverseAtmosphere {
   energyLevel: number;
 }
 
+export type PlanetArchetype =
+  | 'gas-giant'
+  | 'terrestrial'
+  | 'crystalline'
+  | 'ethereal';
+
 export interface SongPlanet {
   id: string;
   track: JamendoTrack;
@@ -82,6 +88,13 @@ export interface SongPlanet {
   planetSize: number;
   primaryColor: string;
   secondaryColor: string;
+  surfaceColor?: string;
+  atmosphereColor?: string;
+  archetype?: PlanetArchetype;
+  archetypeLabel?: string;
+  textureVariant?: number;
+  axialTilt?: [number, number, number];
+  hasMoon?: boolean;
   ringStyle: 'none' | 'thin' | 'double' | 'halo';
   region: string;
   similarityScore: number;

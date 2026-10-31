@@ -11,6 +11,7 @@ import {
   Clock,
   Tag,
   GitBranch,
+  Globe2,
 } from 'lucide-react';
 import { ConstellationEdge, SongPlanet } from '@/types/echoverse';
 
@@ -20,6 +21,7 @@ interface PlanetInspectorPanelProps {
   constellations: ConstellationEdge[];
   isPlayingThis: boolean;
   onClose: () => void;
+  onResetView?: () => void;
   onTogglePlay: () => void;
   onSelectPlanet: (planet: SongPlanet, autoPlay?: boolean) => void;
   onDiscoverSimilar: (planet: SongPlanet) => void;
@@ -37,6 +39,7 @@ export default function PlanetInspectorPanel({
   constellations,
   isPlayingThis,
   onClose,
+  onResetView,
   onTogglePlay,
   onSelectPlanet,
   onDiscoverSimilar,
@@ -71,35 +74,54 @@ export default function PlanetInspectorPanel({
   return (
     <aside
       aria-label={`Song planet details for ${track.name}`}
-      className="w-full sm:w-[370px] max-h-[calc(100vh-190px)] overflow-y-auto rounded-2xl bg-[#07091b]/88 backdrop-blur-2xl border border-white/15 shadow-[0_0_45px_rgba(6,182,212,0.18)] p-4 text-white z-20"
+      className="w-full sm:w-[360px] max-h-[calc(100vh-195px)] overflow-y-auto rounded-2xl bg-[#050716]/84 backdrop-blur-2xl border border-white/14 shadow-[0_16px_55px_rgba(0,0,0,0.8)] p-4 text-white z-20"
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span
             className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border"
             style={{
-              backgroundColor: `${planet.primaryColor}22`,
-              borderColor: `${planet.primaryColor}66`,
+              backgroundColor: `${planet.primaryColor}20`,
+              borderColor: `${planet.primaryColor}55`,
               color: '#e2e8f0',
             }}
           >
             {planet.region}
           </span>
+          {planet.archetypeLabel && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/8 text-slate-300 border border-white/12">
+              {planet.archetypeLabel}
+            </span>
+          )}
           {planet.journeyStepIndex && (
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-cyan-500/25 text-cyan-200 border border-cyan-400/40">
-              Journey Step {planet.journeyStepIndex}
+              Step {planet.journeyStepIndex}
             </span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-400"
-          aria-label="Close song planet details"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {onResetView && (
+            <button
+              type="button"
+              onClick={onResetView}
+              className="px-2 py-1 rounded-lg text-[10px] font-medium text-cyan-300 hover:text-white bg-white/6 hover:bg-white/12 border border-white/10 inline-flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition"
+              title="Return camera to full galaxy overview"
+              aria-label="Return camera to full galaxy overview"
+            >
+              <Globe2 className="w-3 h-3" />
+              <span>Overview</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+            aria-label="Close song planet details"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Artwork & Main Track Info */}

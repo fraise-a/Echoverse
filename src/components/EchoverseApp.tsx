@@ -158,6 +158,8 @@ export default function EchoverseApp() {
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
   const [selectedPlanet, setSelectedPlanet] = useState<SongPlanet | null>(null);
+  const [playingPlanet, setPlayingPlanet] = useState<SongPlanet | null>(null);
+  const [viewResetVersion, setViewResetVersion] = useState<number>(0);
   const [showInspector, setShowInspector] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [hasUserInteracted, setHasUserInteracted] = useState<boolean>(false);
@@ -277,12 +279,19 @@ export default function EchoverseApp() {
         setActiveJourneyStepIndex(0);
         if (data.planets.length > 0) {
           setSelectedPlanet(data.planets[0]);
+          setPlayingPlanet(data.planets[0]);
           setShowInspector(true);
         }
       } else {
         setActiveJourney(null);
+        // Start in the full 3D Galaxy Overview while priming the bottom player with the lead track
+        setSelectedPlanet(null);
+        setShowInspector(false);
+        setViewResetVersion((v) => v + 1);
         if (data.planets.length > 0) {
-          setSelectedPlanet(data.planets[0]);
+          setPlayingPlanet((prev) =>
+            isPlayingRef.current && prev ? prev : data.planets[0]
+          );
         }
       }
 
@@ -643,6 +652,7 @@ export default function EchoverseApp() {
     setGuideMessage(saved.journey.narrativeOverview);
     if (saved.planets.length > 0) {
       setSelectedPlanet(saved.planets[0]);
+      setPlayingPlanet(saved.planets[0]);
       setShowInspector(true);
     }
   };
@@ -655,6 +665,7 @@ export default function EchoverseApp() {
     const matchingPlanet = planets.find((p) => p.id === step.planetId);
     if (matchingPlanet) {
       setSelectedPlanet(matchingPlanet);
+      setPlayingPlanet(matchingPlanet);
       setShowInspector(true);
       setHasUserInteracted(true);
       setIsPlaying(true);
@@ -668,6 +679,7 @@ export default function EchoverseApp() {
   const handleSelectPlanet = useCallback((planet: SongPlanet, autoPlay = false) => {
     setHasUserInteracted(true);
     setSelectedPlanet(planet);
+    setPlayingPlanet(planet);
     setShowInspector(true);
     if (planet.journeyStepIndex) {
       setActiveJourneyStepIndex(planet.journeyStepIndex - 1);
@@ -675,6 +687,12 @@ export default function EchoverseApp() {
     if (autoPlay) {
       setIsPlaying(true);
     }
+  }, []);
+
+  const handleResetGalaxyView = useCallback(() => {
+    setSelectedPlanet(null);
+    setShowInspector(false);
+    setViewResetVersion((v) => v + 1);
   }, []);
 
   const handlePlayPause = useCallback((shouldPlay: boolean) => {
@@ -703,7 +721,9 @@ export default function EchoverseApp() {
         currentIndex === -1
           ? 0
           : (currentIndex + direction + planets.length) % planets.length;
-      setSelectedPlanet(planets[nextIndex]);
+      const nextPlanet = planets[nextIndex];
+      setSelectedPlanet(nextPlanet);
+      setPlayingPlanet(nextPlanet);
       setShowInspector(true);
     },
     [planets, selectedPlanet]
@@ -792,6 +812,24 @@ export default function EchoverseApp() {
               </>
             )}
           </button>
+
+          {/* Reset Camera to Full Galaxy Overview */}
+          {viewMode === '3d' && (
+            <button
+              type="button"
+              onClick={handleResetGalaxyView}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-400 transition ${
+                selectedPlanet
+                  ? 'bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-400/40 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.22)]'
+                  : 'bg-white/8 hover:bg-white/15 border-white/15 text-slate-300 hover:text-white'
+              }`}
+              aria-label="Reset camera to full Galaxy Overview"
+              title="Reset camera to full Galaxy Overview"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-cyan-300" />
+              <span className="hidden lg:inline">Galaxy Overview</span>
+            </button>
+          )}
 
           {/* Keyboard / Button Planet Stepper */}
           <div className="hidden sm:flex items-center rounded-xl bg-white/8 border border-white/15 p-0.5">
@@ -889,11 +927,16 @@ export default function EchoverseApp() {
               constellations={constellations}
               atmosphere={atmosphere}
               selectedPlanet={selectedPlanet}
-              playingTrackId={selectedPlanet?.track.id || null}
+              playingTrackId={
+                playingPlanet?.track.id || selectedPlanet?.track.id || null
+              }
               isPlaying={isPlaying}
               reducedMotion={reducedMotion}
               simplifiedGraphics={simplifiedGraphics}
+              viewResetVersion={viewResetVersion}
+              isInspectorOpen={showInspector && Boolean(selectedPlanet)}
               onSelectPlanet={(planet) => handleSelectPlanet(planet, false)}
+              onBackgroundClick={handleResetGalaxyView}
             />
           </ThreeSceneErrorBoundary>
         ) : (
@@ -901,16 +944,22 @@ export default function EchoverseApp() {
             planets={planets}
             constellations={constellations}
             atmosphere={atmosphere}
-            selectedPlanet={selectedPlanet}
-            playingTrackId={selectedPlanet?.track.id || null}
+            selectedPlanet={selectedPlanet || playingPlanet}
+            playingTrackId={
+              playingPlanet?.track.id || selectedPlanet?.track.id || null
+            }
             isPlaying={isPlaying}
             onSelectPlanet={handleSelectPlanet}
             onTogglePlay={(planet) => {
               setHasUserInteracted(true);
-              if (selectedPlanet?.id === planet.id) {
-                setIsPlaying(!isPlaying);
+              if (
+                (playingPlanet?.id || selectedPlanet?.id) === planet.id &&
+                isPlaying
+              ) {
+                setIsPlaying(false);
               } else {
                 setSelectedPlanet(planet);
+                setPlayingPlanet(planet);
                 setIsPlaying(true);
               }
             }}
@@ -919,11 +968,11 @@ export default function EchoverseApp() {
         )}
 
         {/* Top-Left AI Musical Guide & Multimodal Observation Card */}
-        <div className="absolute top-3 left-4 sm:left-6 z-20 max-w-md pointer-events-auto space-y-2">
+        <div className="absolute top-3 left-4 sm:left-6 z-20 max-w-[390px] pointer-events-auto space-y-2">
           <div
             role="status"
             aria-live="polite"
-            className="rounded-2xl bg-[#06081a]/82 backdrop-blur-xl border border-white/15 p-3.5 shadow-[0_0_35px_rgba(0,0,0,0.65)]"
+            className="rounded-2xl bg-[#050816]/80 backdrop-blur-2xl border border-white/12 p-3.5 shadow-[0_12px_40px_rgba(0,0,0,0.68)]"
           >
             <div className="flex items-center justify-between gap-2 mb-1">
               <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-300 flex items-center gap-1.5">
@@ -1073,11 +1122,21 @@ export default function EchoverseApp() {
               planet={selectedPlanet}
               allPlanets={planets}
               constellations={constellations}
-              isPlayingThis={isPlaying}
+              isPlayingThis={
+                isPlaying &&
+                (!playingPlanet || playingPlanet.id === selectedPlanet.id)
+              }
               onClose={() => setShowInspector(false)}
+              onResetView={handleResetGalaxyView}
               onTogglePlay={() => {
                 setHasUserInteracted(true);
-                setIsPlaying(!isPlaying);
+                if (playingPlanet && playingPlanet.id !== selectedPlanet.id) {
+                  setPlayingPlanet(selectedPlanet);
+                  setIsPlaying(true);
+                } else {
+                  setPlayingPlanet(selectedPlanet);
+                  setIsPlaying(!isPlaying);
+                }
               }}
               onSelectPlanet={handleSelectPlanet}
               onDiscoverSimilar={handleDiscoverSimilar}
@@ -1090,7 +1149,7 @@ export default function EchoverseApp() {
           <div
             role="status"
             aria-live="assertive"
-            className="absolute inset-x-0 top-1/2 -translate-y-1/2 mx-auto w-fit max-w-md px-5 py-3 rounded-2xl bg-[#07091e]/95 border border-cyan-400/40 shadow-[0_0_40px_rgba(34,211,238,0.35)] flex items-center gap-3 z-30"
+            className="absolute inset-x-0 top-1/2 -translate-y-1/2 mx-auto w-fit max-w-md px-5 py-3 rounded-2xl bg-[#050816]/95 border border-cyan-400/40 shadow-[0_0_40px_rgba(34,211,238,0.35)] flex items-center gap-3 z-30"
           >
             <div className="w-5 h-5 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin shrink-0" />
             <span className="text-xs font-medium text-cyan-100">
@@ -1114,7 +1173,7 @@ export default function EchoverseApp() {
           )}
 
           {/* Main Natural-Language & Voice Discovery Bar */}
-          <div className="w-full max-w-3xl rounded-2xl bg-[#06081b]/88 backdrop-blur-2xl border border-white/15 shadow-[0_0_45px_rgba(124,58,237,0.28)] p-2.5 pointer-events-auto">
+          <div className="w-full max-w-2xl rounded-2xl bg-[#050816]/82 backdrop-blur-2xl border border-white/12 shadow-[0_14px_45px_rgba(0,0,0,0.72)] p-2.5 pointer-events-auto">
             {/* Quick Suggestion & Follow-up Chips */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-300 shrink-0 px-1 inline-flex items-center gap-1">
@@ -1206,7 +1265,7 @@ export default function EchoverseApp() {
 
       {/* Persistent Music Player Footer */}
       <MusicPlayer
-        activePlanet={selectedPlanet}
+        activePlanet={playingPlanet || selectedPlanet || planets[0] || null}
         planets={planets}
         isPlaying={isPlaying}
         hasUserInteracted={hasUserInteracted}
